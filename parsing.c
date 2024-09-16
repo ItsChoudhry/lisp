@@ -1,4 +1,6 @@
+#include "lval.h"
 #include "mpc.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -6,45 +8,45 @@
 #include <editline/readline.h>
 #include <string.h>
 
-typedef struct {
-  int type;
-  long num;
-  int err;
-} lval;
+lval eval_op(lval x, char *op, lval y) {
 
-long eval_op(long x, char *op, long y) {
-  if (strcmp(op, "+") == 0) {
-    return x + y;
+  if (x.type == LVAL_ERR) {
+    return x;
+  }
+  if (y.type == LVAL_ERR) {
+    return y;
   }
 
+  if (strcmp(op, "+") == 0) {
+    return lval_num(x.num + y.num);
+  }
   if (strcmp(op, "-") == 0) {
-    return x - y;
+    return lval_num(x.num - y.num);
   }
   if (strcmp(op, "*") == 0) {
-    return x * y;
+    return lval_num(x.num * y.num);
   }
   if (strcmp(op, "/") == 0) {
-    return x / y;
+    return y.num == 0 ? lval_err(LERR_DIV_ZERO) : lval_num(x.num / y.num);
   }
-  return 0;
+
+  return lval_err(LERR_BAD_OP);
 }
 
-long eval(mpc_ast_t *t) {
-  // if tagged as number return directly
+lval eval(mpc_ast_t *t) {
+
   if (strstr(t->tag, "number")) {
-    return atoi(t->contents);
+    /* Check if there is some error in conversion */
+    errno = 0;
+    long x = strtol(t->contents, NULL, 10);
+    return errno != ERANGE ? lval_num(x) : lval_err(LERR_BAD_NUM);
   }
 
-  // the oprerator is always the second child
   char *op = t->children[1]->contents;
+  lval x = eval(t->children[2]);
 
-  // we store the third child in x
-  long x = eval(t->children[2]);
-
-  // iterate the remaining children and combining
   int i = 3;
   while (strstr(t->children[i]->tag, "expr")) {
-
     x = eval_op(x, op, eval(t->children[i]));
     i++;
   }
@@ -78,8 +80,8 @@ int main(int argc, char **argv) {
 
     mpc_result_t r;
     if (mpc_parse("<stdin>", input, Lispy, &r)) {
-      long result = eval(r.output);
-      printf("%li\n", result);
+      lval result = eval(r.output);
+      lval_println(result);
       mpc_ast_delete(r.output);
     } else {
       mpc_err_print(r.error);
