@@ -68,7 +68,7 @@ int main(int argc, char **argv) {
     symbol   : '+' | '-' | '*' | '/' ;                  \
     sexpr    : '(' <expr>* ')' ;                 \
     expr     : <number> | <symbol> | <sexpr> ;      \
-    lispy    : /^/ <operator> <expr>+ /$/ ;                \
+    lispy    : /^/ <expr>* /$/ ;                \
   ",
             Number, Symbol, Sexpr, Expr, Lispy);
 
@@ -93,6 +93,6 @@ int main(int argc, char **argv) {
     free(input);
   }
 
-  mpc_cleanup(4, Number, Symbol, Sexpr, Expr, Lispy);
+  mpc_cleanup(5, Number, Symbol, Sexpr, Expr, Lispy);
   return 0;
 }
