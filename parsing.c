@@ -6,53 +6,6 @@
 
 #include <editline/history.h>
 #include <editline/readline.h>
-#include <string.h>
-
-lval eval_op(lval x, char *op, lval y) {
-
-  if (x.type == LVAL_ERR) {
-    return x;
-  }
-  if (y.type == LVAL_ERR) {
-    return y;
-  }
-
-  if (strcmp(op, "+") == 0) {
-    return lval_num(x.num + y.num);
-  }
-  if (strcmp(op, "-") == 0) {
-    return lval_num(x.num - y.num);
-  }
-  if (strcmp(op, "*") == 0) {
-    return lval_num(x.num * y.num);
-  }
-  if (strcmp(op, "/") == 0) {
-    return y.num == 0 ? lval_err(LERR_DIV_ZERO) : lval_num(x.num / y.num);
-  }
-
-  return lval_err(LERR_BAD_OP);
-}
-
-lval eval(mpc_ast_t *t) {
-
-  if (strstr(t->tag, "number")) {
-    /* Check if there is some error in conversion */
-    errno = 0;
-    long x = strtol(t->contents, NULL, 10);
-    return errno != ERANGE ? lval_num(x) : lval_err(LERR_BAD_NUM);
-  }
-
-  char *op = t->children[1]->contents;
-  lval x = eval(t->children[2]);
-
-  int i = 3;
-  while (strstr(t->children[i]->tag, "expr")) {
-    x = eval_op(x, op, eval(t->children[i]));
-    i++;
-  }
-
-  return x;
-}
 
 int main(int argc, char **argv) {
 
@@ -62,13 +15,12 @@ int main(int argc, char **argv) {
   mpc_parser_t *Expr = mpc_new("expr");
   mpc_parser_t *Lispy = mpc_new("lispy");
 
-  mpca_lang(MPCA_LANG_DEFAULT,
-            "                                                    \
-    number   : /-?[0-9]+/ ;                              \
-    symbol   : '+' | '-' | '*' | '/' ;                  \
-    sexpr    : '(' <expr>* ')' ;                 \
-    expr     : <number> | <symbol> | <sexpr> ;      \
-    lispy    : /^/ <expr>* /$/ ;                \
+  mpca_lang(MPCA_LANG_DEFAULT, "             \
+    number : /-?[0-9]+/ ;                    \
+    symbol : '+' | '-' | '*' | '/' ;         \
+    sexpr  : '(' <expr>* ')' ;               \
+    expr   : <number> | <symbol> | <sexpr> ; \
+    lispy  : /^/ <expr>* /$/ ;               \
   ",
             Number, Symbol, Sexpr, Expr, Lispy);
 
@@ -82,9 +34,9 @@ int main(int argc, char **argv) {
 
     mpc_result_t r;
     if (mpc_parse("<stdin>", input, Lispy, &r)) {
-      lval result = eval(r.output);
-      lval_println(result);
-      mpc_ast_delete(r.output);
+      lval *x = lval_eval(lval_read(r.output));
+      lval_println(x);
+      lval_del(x);
     } else {
       mpc_err_print(r.error);
       mpc_err_delete(r.error);
