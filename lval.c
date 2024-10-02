@@ -51,6 +51,13 @@ lval *lval_qexpr(void) {
   return v;
 }
 
+lval *lval_fun(lbuiltin func) {
+  lval *v = malloc(sizeof(lval));
+  v->type = LVAL_FUN;
+  v->fun = func;
+  return v;
+}
+
 void lval_del(lval *v) {
 
   switch (v->type) {
@@ -62,7 +69,9 @@ void lval_del(lval *v) {
   case LVAL_SYM:
     free(v->sym);
     break;
-
+  case LVAL_FUN:
+    printf("<function>");
+    break;
   /* If Qexpr or Sexpr then delete all elements inside */
   case LVAL_QEXPR:
   case LVAL_SEXPR:
@@ -73,8 +82,42 @@ void lval_del(lval *v) {
     free(v->cell);
     break;
   }
-
   free(v);
+}
+
+lval *lval_copy(lval *v) {
+  lval *x = malloc(sizeof(lval));
+  x->type = v->type;
+
+  switch (v->type) {
+  case LVAL_FUN:
+    x->fun = v->fun;
+    break;
+  case LVAL_NUM:
+    x->num = v->num;
+    break;
+
+  case LVAL_ERR:
+    x->err = malloc(strlen(v->err) + 1);
+    strcpy(x->err, v->err);
+    break;
+
+  case LVAL_SYM:
+    x->sym = malloc(strlen(v->sym) + 1);
+    strcpy(x->sym, v->sym);
+    break;
+
+  case LVAL_SEXPR:
+  case LVAL_QEXPR:
+    x->count = v->count;
+    x->cell = malloc(sizeof(lval *) * x->count);
+    for (int i = 0; i < x->count; i++) {
+      x->cell[i] = lval_copy(v->cell[i]);
+    }
+    break;
+  }
+
+  return x;
 }
 
 lval *lval_add(lval *v, lval *x) {
@@ -352,4 +395,22 @@ lval *builtin(lval *a, char *func) {
   }
   lval_del(a);
   return lval_err("Unknown Function!");
+}
+
+lenv *lenv_new(void) {
+  lenv *e = malloc(sizeof(lenv));
+  e->count = 0;
+  e->syms = NULL;
+  e->vals = NULL;
+  return e;
+}
+
+void *lenv_del(lenv *e) {
+  for (int i = 0; i < e->count; i++) {
+    free(e->syms[i]);
+    lval_del(e->vals[i]);
+  }
+  free(e->syms);
+  free(e->vals);
+  free(e);
 }
